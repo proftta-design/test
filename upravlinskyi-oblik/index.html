@@ -1,0 +1,815 @@
+<title>Будпрокат P&amp;L</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap&subset=cyrillic">
+<style>
+/* Layout: sticky header with period/source → tab strip → one working view at a time; tables scroll inside their own frames. */
+:root{
+  --bg:#f4f5f7; --surface:#ffffff; --surface-2:#eef0f4; --line:#d9dde5; --fg:#1b2230; --fg-2:#576071; --fg-3:#8a92a1;
+  --accent:#d9731a; --accent-soft:#fbe9d8; --ink:#23324d;
+  --good:#1f7a4d; --good-soft:#e1f2e8; --warn:#a86400; --warn-soft:#fdf1d6; --bad:#b3261e; --bad-soft:#fbe3e1;
+  --key:#fff6e6;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif; --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2f3946; --fg:#e7eaf0; --fg-2:#a6aebb; --fg-3:#737c8a;
+  --accent:#f0913f; --accent-soft:#3a2a1b; --ink:#9db4dd;
+  --good:#5cc48e; --good-soft:#173527; --warn:#f0b450; --warn-soft:#3a2e16; --bad:#f2847b; --bad-soft:#3d1f1d; --key:#2a2418; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --surface:#1a2029; --surface-2:#222a35; --line:#2f3946; --fg:#e7eaf0; --fg-2:#a6aebb; --fg-3:#737c8a;
+  --accent:#f0913f; --accent-soft:#3a2a1b; --ink:#9db4dd;
+  --good:#5cc48e; --good-soft:#173527; --warn:#f0b450; --warn-soft:#3a2e16; --bad:#f2847b; --bad-soft:#3d1f1d; --key:#2a2418; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-row{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding-block:12px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:18px;margin:0;letter-spacing:.01em}
+.brand .tag{font-size:12px;color:var(--fg-3)}
+.ctl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg-2)}
+select,input[type=text],input[type=number],textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+input[type=number]{width:110px;text-align:right;font-variant-numeric:tabular-nums}
+textarea{width:100%;font-family:var(--f-mono);font-size:12px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:6px 12px}
+button:hover{border-color:var(--fg-3)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.05)}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs a{padding:10px 14px;color:var(--fg-2);text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+nav.tabs a.on{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs a .cnt{font-size:11px;background:var(--warn-soft);color:var(--warn);border-radius:9px;padding:1px 6px;margin-left:4px}
+main{padding-block:20px 60px}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px}
+.banner.demo{background:var(--accent-soft);color:var(--fg)}
+.banner.warn{background:var(--warn-soft)}
+.banner.bad{background:var(--bad-soft)}
+.banner b{font-weight:600}
+h2{font-family:var(--f-display);font-weight:500;font-size:16px;margin:0 0 4px;text-wrap:balance}
+h3{font-size:14px;font-weight:600;margin:18px 0 8px}
+.sub{color:var(--fg-2);margin:0 0 14px;max-width:80ch}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tile .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-3)}
+.tile .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.tile .d{font-size:12px;color:var(--fg-2)}
+.tile.alert{border-color:var(--warn);background:var(--warn-soft);cursor:pointer}
+.frame{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-3);font-weight:600;background:var(--surface-2);position:sticky;top:0}
+td.n,th.n{text-align:right;white-space:nowrap}
+td.code{font-family:var(--f-mono);font-size:12px;color:var(--fg-3);white-space:nowrap}
+tr.sec td{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink)}
+tr.sub td{font-weight:600}
+tr.key td{background:var(--key);font-weight:700;border-top:1px solid var(--accent)}
+tr.memo td{color:var(--fg-2);font-style:italic;font-size:13px}
+tr.det td:nth-child(2){padding-left:22px}
+tr.det.zero{display:none}
+.showzero tr.det.zero{display:table-row}
+.neg{color:var(--bad)}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:var(--surface-2);color:var(--fg-2);white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.desc{max-width:42ch;color:var(--fg-2);font-size:13px;word-break:break-word}
+td select{max-width:260px}
+.gap-list{display:grid;gap:10px}
+.gap{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.gap .sev{grid-row:span 3;width:8px;border-radius:4px}
+.gap .sev.bad{background:var(--bad)} .gap .sev.warn{background:var(--warn)} .gap .sev.good{background:var(--good)}
+.gap .t{font-weight:600}
+.gap .w,.gap .f{font-size:13px;color:var(--fg-2)}
+.gap .f b{color:var(--fg)}
+.muted{color:var(--fg-3)}
+.mono{font-family:var(--f-mono);font-size:12px}
+.small{font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:8px;font-size:13px;z-index:20}
+@media (max-width:640px){.brand h1{font-size:15px}.tile .v{font-size:18px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand"><h1>Будпрокат P&amp;L</h1><span class="tag">управлінський облік за магазинами</span></div>
+      <label class="ctl" for="period">Період <select id="period"></select></label>
+      <label class="ctl" for="fopSel">Юрособа <select id="fopSel"></select></label>
+    </div>
+    <nav class="tabs" id="tabs">
+      <a href="#pnl" data-v="pnl">P&amp;L</a>
+      <a href="#queue" data-v="queue">Розбір платежів<span class="cnt" id="qcnt" hidden></span></a>
+      <a href="#inputs" data-v="inputs">Дані поза CRM</a>
+      <a href="#metrics" data-v="metrics">Метрики</a>
+      <a href="#deposits" data-v="deposits">Застави</a>
+      <a href="#cash" data-v="cash">Рух поза P&amp;L</a>
+      <a href="#rules" data-v="rules">Правила й довідник</a>
+      <a href="#data" data-v="data">Джерела даних</a>
+      <a href="#gaps" data-v="gaps">Чого не вистачає</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="srcBanner"></div>
+  <section id="v-pnl" class="view"></section>
+  <section id="v-queue" class="view" hidden></section>
+  <section id="v-inputs" class="view" hidden></section>
+  <section id="v-metrics" class="view" hidden></section>
+  <section id="v-deposits" class="view" hidden></section>
+  <section id="v-cash" class="view" hidden></section>
+  <section id="v-rules" class="view" hidden></section>
+  <section id="v-data" class="view" hidden></section>
+  <section id="v-gaps" class="view" hidden></section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ============================ ДОВІДНИК СТАТЕЙ ============================ */
+// [code, name, type, direction, defaultBase]  type: rev|cogs|direct|gen|amort|fin|tax|np
+const A = [
+["1.1.01","Оренда: погодинна","rev","Оренда"],["1.1.02","Оренда: добова","rev","Оренда"],["1.1.03","Оренда: довгострокова","rev","Оренда"],
+["1.1.04","Оренда: прострочення повернення","rev","Оренда"],["1.1.05","Оренда: компенсація за пошкодження/втрату","rev","Оренда"],
+["1.1.06","Оренда: неповернені застави","rev","Оренда"],["1.1.07","Оренда: сервісні збори","rev","Оренда"],["1.1.99","Оренда: знижки та повернення коштів (−)","rev","Оренда"],
+["1.2.01","Продаж: новий інструмент","rev","Продаж інстр."],["1.2.02","Продаж: б/в з орендного парку","rev","Продаж інстр."],["1.2.99","Продаж: повернення від покупців (−)","rev","Продаж інстр."],
+["1.3.01","Витратні: оснастка","rev","Витратні"],["1.3.02","Витратні: ЗІЗ та супутні","rev","Витратні"],["1.3.03","Витратні: паливо та мастила","rev","Витратні"],
+["1.4.01","Доставка до клієнта","rev","Доставка"],["1.4.02","Забір від клієнта","rev","Доставка"],["1.4.03","Вантажні роботи, терміновий виїзд","rev","Доставка"],
+["2.1.01","Суборенда в інших прокатів","cogs","Оренда"],["2.1.02","Агентські комісії","cogs","Оренда"],
+["2.2.01","Закупівля інструменту для продажу","cogs","Продаж інстр."],["2.2.02","Залишкова вартість проданого б/в","cogs","Продаж інстр."],
+["2.3.01","Закупівля витратних матеріалів","cogs","Витратні"],
+["2.4.01","Доставка: пальне","cogs","Доставка"],["2.4.02","Доставка: ЗП водіїв і ЄСВ","cogs","Доставка"],["2.4.03","Доставка: ремонт і ТО авто","cogs","Доставка"],
+["2.4.04","Доставка: страхування, парковки, дороги","cogs","Доставка"],["2.4.05","Доставка: зовнішні перевізники","cogs","Доставка"],
+["3.1.01","Оренда приміщення","direct"],["3.1.02","Комунальні","direct"],["3.1.03","Охорона та сигналізація","direct"],["3.1.04","Поточний ремонт і прибирання","direct"],
+["3.2.01","ЗП персоналу магазину","direct"],["3.2.02","Бонуси та відсотки","direct"],["3.2.03","ЄСВ на ЗП","direct"],["3.2.04","Відпускні, лікарняні, навчання","direct"],
+["3.3.01","Парк: запчастини для ремонту","direct","Оренда"],["3.3.02","Парк: зовнішній сервіс","direct","Оренда"],["3.3.03","Парк: ТО та витратні на обслуговування","direct","Оренда"],
+["3.3.04","Парк: списання без компенсації","direct","Оренда"],["3.3.05","Парк: страхування","direct","Оренда"],
+["3.4.01","РКО рахунку магазину","direct"],["3.4.02","Еквайринг і платіжні посилання","direct"],["3.4.03","Інкасація, ПРРО, обслуговування каси","direct"],
+["3.5.01","Локальний маркетинг точки","direct"],["3.6.01","Інтернет і телефон точки","direct"],["3.6.02","Канцтовари, госптовари, пакування","direct"],["3.7.01","Нестачі, крадіжки, касові розбіжності","direct"],
+["4.1.01","Адміністрація: ЗП керівництва та офісу","gen",null,"Виручка"],["4.1.02","Адміністрація: офіс","gen",null,"Виручка"],
+["4.2.01","Бухгалтерія: ЗП / аутсорс","gen",null,"Договори"],["4.2.02","РКО рахунків компанії та ФОП","gen",null,"Виручка"],
+["4.3.01","Маркетинг: контекст і таргет","gen",null,"Виручка"],["4.3.02","Маркетинг: сайт, SEO, SMM","gen",null,"Виручка"],["4.3.03","Колл-центр і обробка заявок","gen",null,"Договори"],
+["4.4.01","IT: система прокату, CRM, облікове ПЗ","gen",null,"Парк_шт"],["4.4.02","IT: хостинг, телефонія, ліцензії","gen",null,"Договори"],
+["4.5.01","Переміщення парку між магазинами","gen",null,"Парк_шт"],["4.5.02","Авто керівництва","gen",null,"Виручка"],
+["4.6.01","Центральна майстерня і склад","gen","Оренда","Парк_варт"],
+["4.7.01","Юристи, нотаріус","gen",null,"Виручка"],["4.7.02","Стягнення боргів і неповернених","gen",null,"Договори"],
+["4.8.01","ЄСВ ФОП за себе, місцеві збори","gen",null,"Виручка"],["4.9.01","Безнадійна дебіторка","gen",null,"Виручка"],["4.9.02","Представницькі, штрафи, благодійність","gen",null,"Виручка"],
+["6.1.01","Амортизація орендного парку","amort","Оренда"],["6.2.01","Амортизація авто доставки","amort","Доставка"],["6.3.01","Амортизація обладнання, ремонтів","amort",null,"Площа"],
+["7.1.01","Відсотки за кредитами та лізингом","fin",null,"Парк_варт"],["7.1.02","Відсотки на залишок (дохід)","fin",null,"Виручка"],["7.2.01","Курсові різниці","fin",null,"Виручка"],
+["7.3.01","Єдиний податок ФОП","tax",null,"Виручка"],["7.3.02","Податок на прибуток ТОВ","tax",null,"Виручка"],
+["8.1.01","Застави отримані","np"],["8.1.02","Застави повернуті","np"],["8.1.03","Утримання застави (перекласифікація)","np"],
+["8.2.01","Купівля інструменту в орендний парк","np"],["8.2.02","Купівля авто","np"],["8.2.03","Відкриття / капремонт магазину, обладнання","np"],
+["8.3.01","Кредит: отримання","np"],["8.3.02","Кредит: погашення тіла","np"],["8.3.03","Лізинг: погашення тіла","np"],["8.3.04","Позики від пов'язаних осіб","np"],["8.3.05","Повернення позик","np"],
+["8.4.01","Внесення коштів власником","np"],["8.4.02","Вилучення коштів / дивіденди","np"],
+["8.5.01","Перекази між рахунками однієї юрособи","np"],["8.5.02","Перекази між юрособами","np"],["8.5.03","Інкасація каса → банк","np"],["8.5.04","Переміщення готівки між касами","np"],["8.5.05","Конвертація валют","np"],
+["8.6.01","Аванси від клієнтів","np"],["8.6.02","Аванси постачальникам","np"],["8.7.01","ПДВ: сплата / відшкодування","np"],
+["9.9.99","Не враховувати (тестові, помилкові, дублікати)","np"]
+];
+const ART = {}; A.forEach(a => ART[a[0]] = {code:a[0], name:a[1], type:a[2], dir:a[3]||"—", base:a[4]||null});
+const SECNAMES = {"1":"Доходи","2":"Собівартість","3":"Прямі витрати магазину","4":"Загальні витрати","6":"Амортизація","7":"Фінансові статті та податки","8":"Рух коштів поза P&L","9":"Службові"};
+const BASES = ["Виручка","Парк_шт","Парк_варт","Площа","Договори"];
+const CENTER = "Центр / Офіс";
+const IN_ONLY = new Set(["rev"]);
+
+/* ============================ ПРАВИЛА ============================ */
+const DEFAULT_RULES = [
+ {dir:"out",re:"оренд.{0,25}(нежитл|приміщ)",code:"3.1.01"},
+ {dir:"out",re:"електроенерг|водопост|водовідв|теплопост|газопост|комунальн|вивіз сміття|ТКВ",code:"3.1.02"},
+ {dir:"out",re:"охорон|сигналізац|пульт",code:"3.1.03"},
+ {dir:"out",re:"заробітн|зарплат|з/п|аванс з зп",code:"3.2.01"},
+ {dir:"out",re:"ЄСВ|єдиний внесок",code:"3.2.03"},
+ {dir:"out",re:"єдиний податок",code:"7.3.01"},
+ {dir:"out",re:"податок на прибуток",code:"7.3.02"},
+ {dir:"out",re:"WOG|OKKO|ОККО|SOCAR|UPG|БРСМ|АЗС|пальне|дизел|бензин",code:"2.4.01"},
+ {dir:"out",re:"нова пошта|нп експрес|укрпошта|meest|uklon|вантажне таксі",code:"2.4.05"},
+ {dir:"in",re:"доставк",code:"1.4.01"},
+ {dir:"in",re:"забір інструмент|забір від клієнт|вивіз інструмент",code:"1.4.02"},
+ {dir:"out",re:"google|facebook|meta platforms|реклам|prom\\.ua|olx",code:"4.3.01"},
+ {dir:"out",re:"еквайр|acquiring|liqpay|wayforpay|fondy",code:"3.4.02"},
+ {dir:"out",re:"комісія банку|рко|обслуговування рахунку|розрахунково-касов",code:"4.2.02"},
+ {dir:"any",re:"інкасац",code:"8.5.03"},
+ {dir:"out",re:"погашення (тіла )?кредит|повернення кредиту",code:"8.3.02"},
+ {dir:"out",re:"відсотк\\S* за кредит|проценти за кредит",code:"7.1.01"},
+ {dir:"in",re:"відсотк\\S* на залишок|нарахован\\S* відсотк",code:"7.1.02"},
+ {dir:"any",re:"переказ власних коштів|між власними рахунками",code:"8.5.01"},
+ {dir:"in",re:"внесок власника|поповнення від засновника|фінансова допомога від власника",code:"8.4.01"},
+ {dir:"out",re:"запчастин|запасн\\S* частин",code:"3.3.01"},
+ {dir:"out",re:"в орендний парк|поповнення парку",code:"8.2.01"},
+ {dir:"out",re:"витратн\\S* матеріал",code:"2.3.01"},
+ {dir:"out",re:"госптовар|господарськ",code:"3.6.02"},
+ {dir:"out",re:"сервісн\\S* центр|ремонт інструмент|ремонт обладн",code:"3.3.02"},
+ {dir:"out",re:"бухгалтер|аудит",code:"4.2.01"},
+ {dir:"out",re:"юрид|нотаріус|адвокат",code:"4.7.01"},
+ {dir:"out",re:"хостинг|домен|crm|програмне забезпечення|ліцензі|m\\.e\\.doc|медок|BAS |1с",code:"4.4.02"},
+ {dir:"out",re:"інтернет|київстар|vodafone|lifecell|воля|телефонн",code:"3.6.01"},
+ {dir:"out",re:"страхуван",code:"3.3.05"},
+ {dir:"out",re:"ПДВ",code:"8.7.01"},
+ {dir:"in",re:"продаж б/?в|продаж уживан",code:"1.2.02"},
+ {dir:"in",re:"диск|свердл|бури|полотн|коронк",code:"1.3.01"},
+ {dir:"in",re:"рукавиц|окуляр|респіратор|навушник",code:"1.3.02"},
+];
+
+/* ============================ СТАН ============================ */
+const LS = "bp-pnl-v1";
+function load(k, d){ try { const v = localStorage.getItem(LS + ":" + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } }
+function save(k, v){ try { localStorage.setItem(LS + ":" + k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+const S = {
+  tx: [], source: "demo", loadedAt: null,
+  period: load("period", null), fop: "all",
+  rules: load("rules", DEFAULT_RULES),
+  assign: load("assign", {}),       // id -> code
+  branchSet: load("branchSet", {}), // id -> store
+  fopBranch: load("fopBranch", {}), // fop -> store
+  inputs: load("inputs", {}),       // store -> {...}
+  bases: load("bases", {}),         // code -> base override
+  depStart: load("depStart", {}),
+  qFilter: "open", qPage: 0, qSearch: ""
+};
+
+/* ============================ НОРМАЛІЗАЦІЯ ДАНИХ CRM ============================ */
+// Касовий звіт: GET /api/v1/cashbox-report/operations
+function normCash(o){
+  return {id:"c:"+o.id, src:"Каса", date:o.at, amount:Math.abs(+o.amount), dir:o.direction==="RECEIPT"?"in":"out",
+    branch:o.branchName||null, fop:null, party:(o.counterparty&&(o.counterparty.shortName||o.counterparty.name))||null,
+    partyKind:o.counterparty?o.counterparty.kind:null,
+    desc:[o.basisText,o.comment,o.equipment,o.operationType].filter(Boolean).join(" · "), kinds:o.purposeKinds||[],
+    invKinds:[], rent:o.rent?o.rent.displayCode:null, cashbox:o.cashboxName||null};
+}
+// Банківська виписка: GET /api/v1/banking/transactions?includeFees=true
+function normBank(o){
+  return {id:"b:"+o.id, src:"Банк", date:o.receivedAt, amount:Math.abs(+o.amount), dir:o.direction==="INCOMING"?"in":"out",
+    branch:null, fop:o.fopName||null, party:o.counterpartyName||o.partyName||null, partyKind:o.counterpartyKind||null,
+    desc:o.purpose||"", kinds:[], bankKind:o.kind, invKinds:(o.allocations||[]).map(a=>a.invoiceKind),
+    rent:(o.allocations&&o.allocations[0]&&o.allocations[0].rentDisplayCode)||(o.invoiceLink&&o.invoiceLink.rentCode)||null,
+    paymentId:o.paymentId||null, isTest:!!o.isTest, currency:o.currency};
+}
+// Платежі: GET /api/v1/payments
+function normPay(o){
+  return {id:"p:"+o.id, src:"Платіж", date:o.receivedAt, amount:Math.abs(+o.amount), dir:o.direction==="INCOMING"?"in":"out",
+    branch:null, fop:null, party:o.partyName||null, desc:o.description||"", kinds:[], invKinds:[], method:o.method,
+    cashOpId:o.cashOperationId||null, rawId:o.id};
+}
+// Простий CSV: date;amount;direction;branch;fop;party;description;article
+function normCsvRow(r, i){
+  const amt = parseFloat(String(r.amount||"0").replace(/\s/g,"").replace(",","."));
+  const d = String(r.direction||"").toLowerCase();
+  return {id:"x:"+(r.id||i)+":"+(r.date||""), src:"CSV", date:r.date, amount:Math.abs(amt),
+    dir:(d.startsWith("in")||d.startsWith("над")||d==="+"||(!d&&amt>0))?"in":"out",
+    branch:r.branch||null, fop:r.fop||null, party:r.party||null, desc:r.description||"", kinds:[], invKinds:[], csvCode:r.article||null};
+}
+function detect(o){
+  if (o && "purposeKinds" in o && "branchName" in o) return "cash";
+  if (o && "accountIban" in o && "fopName" in o) return "bank";
+  if (o && "method" in o && "receivedAt" in o && "direction" in o) return "pay";
+  return null;
+}
+function ingest(raw){
+  const items = Array.isArray(raw) ? raw : (raw && (raw.items || raw.data)) || [];
+  const out = {cash:[], bank:[], pay:[]};
+  items.forEach(o => { const t = detect(o); if (t) out[t].push(o); });
+  return out;
+}
+function merge(groups){
+  const cash = groups.cash.map(normCash), bank = groups.bank.map(normBank).filter(t=>!t.isTest), pay = groups.pay.map(normPay);
+  const cashIds = new Set(groups.cash.map(o=>o.id)), bankPay = new Set(bank.map(t=>t.paymentId).filter(Boolean));
+  // платіж, що вже є в касі (cashOperationId) або у виписці (paymentId), не дублюємо
+  const payLeft = pay.filter(p => !(p.cashOpId && cashIds.has(p.cashOpId)) && !bankPay.has(p.rawId));
+  return {tx: cash.concat(bank, payLeft, groups.csv||[]), dropped: pay.length - payLeft.length};
+}
+
+/* ============================ КЛАСИФІКАЦІЯ ============================ */
+function systemRule(t){
+  const k = new Set(t.kinds), ik = new Set(t.invKinds);
+  if (t.bankKind === "BANK_FEE") return {code: storeOf(t)!==CENTER ? "3.4.01" : "4.2.02", why:"Банк: комісія"};
+  if (k.has("DEPOSIT_IN") || (ik.has("DEPOSIT") && t.dir==="in")) return {code:"8.1.01", why:"CRM: застава"};
+  if (k.has("DEPOSIT_RETURN")) return {code:"8.1.02", why:"CRM: повернення застави"};
+  if (k.has("DEPOSIT_TO_LOSS")) return {code:"1.1.06", why:"CRM: застава в збиток", reclass:true};
+  if (k.has("DEPOSIT_OFFSET")) return {code:"1.1.02", why:"CRM: залік застави в оплату", reclass:true};
+  if (k.has("PENALTY")) return {code:"1.1.04", why:"CRM: штраф"};
+  if (k.has("REFUND")) return {code:"1.1.99", why:"CRM: повернення коштів"};
+  if (k.has("SURCHARGE")) return {code:"1.1.07", why:"CRM: доплата"};
+  if (ik.has("SALE_LOST")) return {code:"1.1.05", why:"CRM: продаж втраченого"};
+  if ((k.has("PAYMENT_IN") || ik.has("RENT") || ik.has("RENT_TOPUP")) && t.dir==="in") return {code:"1.1.02", why:"CRM: оплата оренди"};
+  return null;
+}
+const ruleCache = new Map();
+function rx(s){ if (!ruleCache.has(s)) { try { ruleCache.set(s, new RegExp(s, "i")); } catch(e){ ruleCache.set(s, null); } } return ruleCache.get(s); }
+function classify(t){
+  if (S.assign[t.id]) return {code:S.assign[t.id], how:"manual", why:"Вручну"};
+  if (t.csvCode && ART[t.csvCode]) return {code:t.csvCode, how:"auto", why:"CSV"};
+  const s = systemRule(t); if (s) return Object.assign({how:"auto"}, s);
+  const hay = [t.desc, t.party].filter(Boolean).join(" ");
+  for (const r of S.rules) {
+    if (r.dir !== "any" && r.dir !== t.dir) continue;
+    const re = rx(r.re); if (re && re.test(hay)) return {code:r.code, how:"rule", why:"Правило: /" + r.re + "/"};
+  }
+  return {code:null, how:"none", why:""};
+}
+function storeOf(t){ return S.branchSet[t.id] || t.branch || (t.fop && S.fopBranch[t.fop]) || CENTER; }
+
+/* ============================ ДЕМО-ДАНІ ============================ */
+function demo(){
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = a => a[Math.floor(rnd()*a.length)];
+  const stores = ["Оболонь","Позняки","Бровари"], w = [1, .6, .25];
+  const fops = {"Оболонь":"ФОП 1 (приклад)","Позняки":"ФОП 2 (приклад)","Бровари":"ФОП 2 (приклад)"};
+  const cash = [], bank = [];
+  let n = 1;
+  const day = (m) => `2026-${m}-${String(1+Math.floor(rnd()*28)).padStart(2,"0")}T${String(9+Math.floor(rnd()*9)).padStart(2,"0")}:15:00Z`;
+  ["09","10"].forEach(m => {
+    stores.forEach((s, si) => {
+      const k = w[si] * (m==="09" ? .92 : 1);
+      const C = (dir, amt, kinds, basis, extra) => cash.push(Object.assign({id:"d"+(n++), documentNumber:null, direction:dir, amount:String(Math.round(amt)), at:day(m),
+        cashboxName:"Каса "+s, branchName:s, employee:null, counterparty:{id:"c"+n, name:pick(["Іваненко О.","Петренко В.","ТОВ Будмонтаж","Сидоренко І.","ФОП Мельник"]), kind:pick(["FL","FL","UL"])},
+        rent:null, equipment:null, purposeKinds:kinds, operationType:null, basisText:basis, comment:null}, extra||{}));
+      for (let i=0;i<Math.round(140*k);i++) C("RECEIPT", 600+rnd()*3600, ["PAYMENT_IN"], "Оплата оренди", {equipment:pick(["Перфоратор","Відбійний молоток","Бетонозмішувач","Генератор","Плиткоріз","Риштування"])});
+      for (let i=0;i<Math.round(120*k);i++) C("RECEIPT", 1500+rnd()*4500, ["DEPOSIT_IN"], "Застава");
+      for (let i=0;i<Math.round(112*k);i++) C("EXPENSE", 1500+rnd()*4500, ["DEPOSIT_RETURN"], "Повернення застави");
+      for (let i=0;i<Math.round(6*k);i++) C("RECEIPT", 300+rnd()*1500, ["PENALTY"], "Прострочення повернення");
+      for (let i=0;i<Math.round(4*k);i++) C("RECEIPT", 1500+rnd()*6000, ["DEPOSIT_TO_LOSS"], "Утримання застави: пошкодження");
+      for (let i=0;i<Math.round(30*k);i++) C("RECEIPT", 300+rnd()*1500, [], pick(["Продаж: диск алмазний","Продаж: свердла","Продаж: рукавиці","Продаж: полотно","Продаж товару"]));
+      for (let i=0;i<Math.round(18*k);i++) C("RECEIPT", 500+rnd()*900, [], "Доставка інструменту");
+      for (let i=0;i<Math.round(8*k);i++) C("EXPENSE", 1200+rnd()*1200, [], pick(["Пальне WOG","АЗС OKKO пальне"]));
+      for (let i=0;i<Math.round(3*k);i++) C("EXPENSE", 400+rnd()*2500, [], pick(["Запчастини до перфоратора","Видано під звіт","Госптовари","Інкасація"]));
+      C("EXPENSE", 25000*k, [], "Аванс з ЗП менеджерам");
+      const B = (dir, amt, purpose, extra) => bank.push(Object.assign({id:"bd"+(n++), receivedAt:day(m), direction:dir, amount:String(Math.round(amt)), currency:"UAH",
+        accountIban:"UA00 0000", fopId:"f", fopName:fops[s], partyName:null, partyInn:null, counterpartyId:null, counterpartyName:null, counterpartyKind:null,
+        partyIban:null, purpose, docNumber:null, kind:"OTHER", matchState:"UNMATCHED", interim:false, isTest:false, paymentId:null, allocations:[], reserve:null}, extra||{}));
+      for (let i=0;i<Math.round(14*k);i++) B("INCOMING", 6000+rnd()*24000, "Оплата за оренду обладнання згідно рах. №"+n, {kind:"CUSTOMER_PAYMENT", counterpartyName:pick(["ТОВ Будмонтаж","ТОВ Сфера Буд","ПП Ремстрой"]), counterpartyKind:"UL", allocations:[{invoiceId:"i",invoiceNumber:"1",invoiceKind:"RENT",amount:"0",rentId:"r",rentDisplayCode:"R-"+n}]});
+      B("INCOMING", 9000+rnd()*9000, "Оплата за інструмент згідно рах.", {kind:"CUSTOMER_PAYMENT"});
+      B("OUTGOING", 70000*k+15000, "Орендна плата за нежитлове приміщення за "+m+".2026", {counterpartyName:"ТОВ Орендодавець"});
+      B("OUTGOING", 9000*k+3000, "Оплата за електроенергію", {counterpartyName:"Енергопостачальник"});
+      B("OUTGOING", 2500, "Послуги охорони, пульт", {counterpartyName:"Охоронна фірма"});
+      B("OUTGOING", 90000*k+20000, "Заробітна плата за "+m+".2026", {});
+      B("OUTGOING", 22000*k+5000, "ЄСВ за "+m+".2026", {counterpartyName:"ГУ ДПС"});
+      B("OUTGOING", 30000*k+5000, "Єдиний податок за "+m+".2026", {counterpartyName:"ГУ ДПС"});
+      B("OUTGOING", 12000*k, "Еквайринг, комісія за "+m, {});
+      B("OUTGOING", 450, "Комісія банку за обслуговування рахунку", {kind:"BANK_FEE"});
+      B("OUTGOING", 45000*k, "Оплата за товар згідно рах. (витратні матеріали)", {counterpartyName:"ТОВ Постачальник"});
+      B("OUTGOING", 15000*k+3000, "Оплата за ремонт інструменту, сервісний центр", {counterpartyName:"Сервіс-центр"});
+      B("OUTGOING", 3000+rnd()*4000, "Оплата згідно рахунку №"+n, {counterpartyName:pick(["ФОП Олійник","ТОВ Альфа","ТОВ Техно"])});
+      if (si===0) {
+        B("OUTGOING", 95000, "Реклама Google Ads", {counterpartyName:"Google Ireland"});
+        B("OUTGOING", 180000, "Заробітна плата офіс", {});
+        B("OUTGOING", 18000, "Бухгалтерські послуги", {});
+        B("OUTGOING", 14000, "Підписка CRM, хостинг", {});
+        B("OUTGOING", 140000, "Закупівля інструменту в орендний парк, рах. №"+n, {counterpartyName:"ТОВ Дистриб'ютор"});
+        B("OUTGOING", 45000, "Погашення тіла кредиту", {counterpartyName:"Банк"});
+        B("OUTGOING", 17000, "Відсотки за кредитом", {counterpartyName:"Банк"});
+        B("OUTGOING", 60000, "Переказ власних коштів", {});
+      }
+    });
+  });
+  return {cash, bank, pay:[]};
+}
+const DEMO_INPUTS = {
+  "Оболонь":{amortFleet:60000, amortCar:12000, units:820, fleetValue:2900000, area:220, contracts:1450, daysRented:14800, daysAvail:24600, delivContracts:260, overdue:120, damageRepair:9000},
+  "Позняки":{amortFleet:37000, amortCar:8000, units:510, fleetValue:1800000, area:150, contracts:900, daysRented:8700, daysAvail:15300, delivContracts:160, overdue:80, damageRepair:5000},
+  "Бровари":{amortFleet:17000, amortCar:3000, units:230, fleetValue:800000, area:80, contracts:380, daysRented:3500, daysAvail:6900, delivContracts:50, overdue:30, damageRepair:2000},
+  [CENTER]:{amortOther:2000}
+};
+const DEMO_FOPBRANCH = {"ФОП 1 (приклад)":"Оболонь","ФОП 2 (приклад)":"Позняки"};
+
+/* ============================ ОБЧИСЛЕННЯ ============================ */
+function txInScope(){
+  return S.tx.filter(t => (!S.period || S.period==="all" || String(t.date||"").slice(0,7)===S.period) && (S.fop==="all" || (t.fop||"—")===S.fop));
+}
+function stores(){
+  const set = new Set(); S.tx.forEach(t => { const s = storeOf(t); if (s!==CENTER) set.add(s); });
+  Object.keys(S.inputs).forEach(s => { if (s!==CENTER) set.add(s); });
+  return Array.from(set).sort();
+}
+function inp(store, key){ const v = S.inputs[store] && S.inputs[store][key]; return +v || 0; }
+function baseOf(code){ return S.bases[code] || ART[code].base || "Виручка"; }
+
+function compute(){
+  const st = stores(), cols = st.concat([CENTER]);
+  const raw = {}; // code -> col -> signed value (in=+ / out=−)
+  const add = (code, col, v) => { (raw[code] = raw[code] || {}); raw[code][col] = (raw[code][col]||0) + v; };
+  const scope = txInScope();
+  let open = 0, openSum = 0, autoCnt = 0, centerDirect = 0;
+  const dep = {}; cols.forEach(c => dep[c] = {in:0, out:0, kept:0});
+  scope.forEach(t => {
+    const c = classify(t), col = storeOf(t);
+    t._c = c; t._store = col;
+    if (!c.code) { open++; openSum += t.amount; return; }
+    if (c.how !== "manual") autoCnt++;
+    const sv = t.dir === "in" ? t.amount : -t.amount;
+    if (c.reclass) { add(c.code, col, t.amount); dep[col].kept += t.amount; add("8.1.03", col, -t.amount); return; }
+    add(c.code, col, sv);
+    if (c.code === "8.1.01") dep[col].in += sv; if (c.code === "8.1.02") dep[col].out += -sv;
+  });
+  // ручні дані (амортизація)
+  st.forEach(s => { if (inp(s,"amortFleet")) add("6.1.01", s, -inp(s,"amortFleet")); if (inp(s,"amortCar")) add("6.2.01", s, -inp(s,"amortCar")); if (inp(s,"amortOther")) add("6.3.01", s, -inp(s,"amortOther")); });
+  if (inp(CENTER,"amortOther")) add("6.3.01", CENTER, -inp(CENTER,"amortOther"));
+
+  // P&L значення: доходи = signed, витрати = −signed
+  const isPL = code => ["rev","cogs","direct","gen","amort","fin","tax"].includes(ART[code].type);
+  const val = {}; Object.keys(raw).forEach(code => { if (!isPL(code)) return; const sign = (ART[code].type==="rev" || code==="7.1.02") ? 1 : -1; val[code] = {}; Object.entries(raw[code]).forEach(([c,v]) => val[code][c] = sign * v); });
+
+  // бази розподілу
+  const revBy = {}; st.forEach(s => { revBy[s] = 0; Object.keys(val).forEach(code => { if (ART[code].type==="rev") revBy[s] += (val[code][s]||0); }); });
+  const baseVals = {"Виручка":revBy, "Парк_шт":{}, "Парк_варт":{}, "Площа":{}, "Договори":{}};
+  const keyMap = {"Парк_шт":"units","Парк_варт":"fleetValue","Площа":"area","Договори":"contracts"};
+  st.forEach(s => Object.entries(keyMap).forEach(([b,k]) => baseVals[b][s] = inp(s,k)));
+  const shares = {}, fallback = new Set();
+  BASES.forEach(b => { const tot = st.reduce((a,s)=>a+Math.max(0,baseVals[b][s]||0),0); shares[b] = {};
+    st.forEach(s => shares[b][s] = tot>0 ? Math.max(0,baseVals[b][s]||0)/tot : null);
+    if (tot<=0) fallback.add(b); });
+  const share = (b, s) => { if (shares[b][s] != null) return shares[b][s]; const t = st.reduce((a,x)=>a+Math.max(0,revBy[x]),0); return t>0 ? Math.max(0,revBy[s])/t : 1/st.length; };
+
+  // розподіл колонки «Центр» на магазини
+  const alloc = {}; // code -> store -> value
+  Object.keys(val).forEach(code => {
+    alloc[code] = {}; st.forEach(s => alloc[code][s] = val[code][s] || 0);
+    const c = val[code][CENTER] || 0;
+    if (c && st.length) { const b = baseOf(code); if (!["gen","fin","tax"].includes(ART[code].type) && code!=="6.3.01") centerDirect += Math.abs(c);
+      st.forEach(s => alloc[code][s] += c * share(b, s)); }
+  });
+  return {st, raw, val, alloc, revBy, baseVals, shares, fallback, open, openSum, autoCnt, centerDirect, dep, scope};
+}
+
+/* ============================ ФОРМАТИ ============================ */
+const nf = new Intl.NumberFormat("uk-UA", {maximumFractionDigits:0});
+const money = v => (v==null||isNaN(v)) ? "—" : (Math.round(v)===0 ? "–" : (v<0 ? "(" + nf.format(-v) + ")" : nf.format(v)));
+const pct = v => (v==null||!isFinite(v)) ? "—" : (v*100).toFixed(1).replace(".",",") + " %";
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cls = v => v < -0.5 ? ' class="n neg"' : ' class="n"';
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(()=>t.hidden=true, 2600); }
+
+/* ============================ P&L ============================ */
+function renderPnl(R){
+  const st = R.st, cols = st;
+  const get = (code, s) => (R.alloc[code] && R.alloc[code][s]) || 0;
+  const sumCodes = (codes, s) => codes.reduce((a,c)=>a+get(c,s),0);
+  const codesOf = (pref) => A.map(a=>a[0]).filter(c => c.startsWith(pref));
+  const line = {}; const rows = [];
+  const tot = arr => arr.reduce((a,b)=>a+b,0);
+  const mk = (label, fn, kind, code) => { const v = cols.map(fn); const r = {label, v, t:tot(v), kind, code}; rows.push(r); return r; };
+  const sec = label => rows.push({label, kind:"sec"});
+  const det = code => mk(ART[code].name, s => get(code,s), "det", code);
+  const ratio = (label, num, den) => rows.push({label, kind:"memo", pct:true, v: cols.map((_,i)=>den.v[i]? num.v[i]/den.v[i] : null), t: den.t ? num.t/den.t : null});
+
+  sec("Виручка");
+  const dirs = [["1.1","Оренда"],["1.2","Продаж інструменту"],["1.3","Витратні матеріали"],["1.4","Доставка"]];
+  dirs.forEach(([p,n]) => { codesOf(p+".").forEach(det); line["rev"+p] = mk("Виручка: "+n, s => sumCodes(codesOf(p+"."), s), "sub"); });
+  line.rev = mk("Виручка разом", s => dirs.reduce((a,[p])=>a+sumCodes(codesOf(p+"."),s),0), "key");
+  sec("Собівартість");
+  const cg = [["2.1","Оренда"],["2.2","Продаж інструменту"],["2.3","Витратні матеріали"],["2.4","Доставка"]];
+  cg.forEach(([p,n]) => { codesOf(p+".").forEach(det); line["cogs"+p] = mk("Собівартість: "+n, s => sumCodes(codesOf(p+"."), s), "sub"); });
+  line.cogs = mk("Собівартість разом", s => cg.reduce((a,[p])=>a+sumCodes(codesOf(p+"."),s),0), "sub");
+  sec("Валовий прибуток за напрямками");
+  dirs.forEach(([p,n],i) => { const g = mk("Валовий прибуток: "+n, (s,j) => line["rev"+p].v[j] - line["cogs"+cg[i][0]].v[j], "sub"); line["gp"+p] = g; ratio("маржа", g, line["rev"+p]); });
+  line.gp = mk("Валовий прибуток разом", (s,j) => line.rev.v[j] - line.cogs.v[j], "key"); ratio("валова маржа", line.gp, line.rev);
+  mk("довідково: валовий прибуток оренди після амортизації парку", (s,j) => line["gp1.1"].v[j] - get("6.1.01",s), "memo");
+  mk("довідково: валовий прибуток доставки після амортизації авто", (s,j) => line["gp1.4"].v[j] - get("6.2.01",s), "memo");
+  sec("Прямі витрати магазину");
+  codesOf("3.").forEach(det);
+  line.dir = mk("Прямі витрати разом", s => sumCodes(codesOf("3."), s), "sub");
+  line.marg = mk("Маржинальний прибуток магазину", (s,j) => line.gp.v[j] - line.dir.v[j], "key"); ratio("маржинальність", line.marg, line.rev);
+  mk("довідково: після амортизації парку магазину", (s,j) => line.marg.v[j] - get("6.1.01",s), "memo");
+  sec("Загальні витрати (розподілені)");
+  codesOf("4.").forEach(det);
+  line.gen = mk("Загальні витрати разом", s => sumCodes(codesOf("4."), s), "sub");
+  line.ebitda = mk("EBITDA", (s,j) => line.marg.v[j] - line.gen.v[j], "key"); ratio("EBITDA-маржа", line.ebitda, line.rev);
+  sec("Амортизація");
+  codesOf("6.").forEach(det);
+  line.am = mk("Амортизація разом", s => sumCodes(codesOf("6."), s), "sub");
+  line.ebit = mk("EBIT (операційний прибуток)", (s,j) => line.ebitda.v[j] - line.am.v[j], "key");
+  sec("Фінансові статті та податки");
+  ["7.1.01","7.1.02","7.2.01","7.3.01","7.3.02"].forEach(det);
+  line.net = mk("Чистий прибуток", (s,j) => line.ebit.v[j] - get("7.1.01",s) + get("7.1.02",s) - get("7.2.01",s) - get("7.3.01",s) - get("7.3.02",s), "key");
+  ratio("чиста маржа", line.net, line.rev);
+
+  const showZero = load("showZero", false);
+  const tiles = [["Виручка", line.rev.t], ["Валовий прибуток", line.gp.t, line.rev.t], ["Маржинальний прибуток", line.marg.t, line.rev.t], ["EBITDA", line.ebitda.t, line.rev.t], ["Чистий прибуток", line.net.t, line.rev.t]];
+  let h = `<h2>P&amp;L за магазинами</h2><p class="sub">Касовий метод: доходи і витрати за датою руху грошей у CRM. Загальні витрати з «${esc(CENTER)}» розподілені на магазини за базами з довідника. Суми в гривнях.</p>`;
+  h += `<div class="tiles">` + tiles.map(([l,v,r]) => `<div class="tile"><div class="l">${l}</div><div class="v${v<0?' neg':''}">${money(v)}</div>${r?`<div class="d">${pct(v/r)} від виручки</div>`:`<div class="d">${R.scope.length} операцій у періоді</div>`}</div>`).join("");
+  if (R.open) h += `<div class="tile alert" onclick="location.hash='queue'"><div class="l">Нерозібрано</div><div class="v">${money(R.openSum)}</div><div class="d">${R.open} платежів без статті — P&amp;L неповний</div></div>`;
+  h += `</div>`;
+  if (R.centerDirect > 0) h += `<div class="banner warn"><span>⚠</span><div><b>${money(R.centerDirect)} грн прямих статей без магазину</b> розподілено за базою. Призначте магазин у «Розборі платежів» або задайте ФОП → магазин у «Дані поза CRM».</div></div>`;
+  if (R.fallback.size) h += `<div class="banner warn"><span>⚠</span><div>Бази <b>${[...R.fallback].join(", ")}</b> не заповнені, для них використано частку виручки. Заповніть їх у «Дані поза CRM».</div></div>`;
+  h += `<div class="toolbar"><label class="row small" for="zeroT"><input type="checkbox" id="zeroT" ${showZero?"checked":""}> Показати статті з нулем</label></div>`;
+  h += `<div class="frame ${showZero?"showzero":""}" id="pnlFrame"><table><thead><tr><th>Код</th><th>Показник</th>${cols.map(c=>`<th class="n">${esc(c)}</th>`).join("")}<th class="n">Разом</th><th class="n">% виручки</th></tr></thead><tbody>`;
+  rows.forEach(r => {
+    if (r.kind === "sec") { h += `<tr class="sec"><td></td><td colspan="${cols.length+3}">${r.label}</td></tr>`; return; }
+    if (r.pct) { h += `<tr class="memo"><td></td><td>&nbsp;&nbsp;${r.label}</td>${r.v.map(v=>`<td class="n">${pct(v)}</td>`).join("")}<td class="n">${pct(r.t)}</td><td></td></tr>`; return; }
+    const zero = r.kind==="det" && r.v.every(v=>Math.abs(v)<0.5);
+    h += `<tr class="${r.kind}${zero?" zero":""}"><td class="code">${r.code||""}</td><td>${esc(r.label)}${r.code&&R.val[r.code]&&R.val[r.code][CENTER]?` <span class="pill" title="Частина суми розподілена з «${esc(CENTER)}» за базою ${esc(baseOf(r.code))}">розп. ${esc(baseOf(r.code))}</span>`:""}</td>${r.v.map(v=>`<td${cls(v)}>${money(v)}</td>`).join("")}<td${cls(r.t)}>${money(r.t)}</td><td class="n muted">${line.rev && line.rev.t && r.kind!=="memo" ? pct(r.t/line.rev.t) : ""}</td></tr>`;
+  });
+  h += `</tbody></table></div>`;
+  document.getElementById("v-pnl").innerHTML = h;
+  document.getElementById("zeroT").onchange = e => { save("showZero", e.target.checked); document.getElementById("pnlFrame").classList.toggle("showzero", e.target.checked); };
+  return line;
+}
+
+/* ============================ РОЗБІР ПЛАТЕЖІВ ============================ */
+function articleOptions(sel, dir){
+  let h = `<option value="">— стаття —</option>`, cur = "";
+  A.forEach(a => { const sec = a[0][0]; if (sec !== cur) { if (cur) h += `</optgroup>`; h += `<optgroup label="${a[0][0]}. ${SECNAMES[sec]}">`; cur = sec; }
+    h += `<option value="${a[0]}"${a[0]===sel?" selected":""}>${a[0]} ${esc(a[1])}</option>`; });
+  return h + `</optgroup>`;
+}
+function renderQueue(R){
+  const st = stores();
+  let list = R.scope.slice();
+  if (S.qFilter === "open") list = list.filter(t => !t._c.code);
+  if (S.qFilter === "auto") list = list.filter(t => t._c.code && t._c.how !== "manual");
+  if (S.qFilter === "manual") list = list.filter(t => t._c.how === "manual");
+  if (S.qFilter === "nostore") list = list.filter(t => t._store === CENTER && t._c.code && !["gen","fin","tax","np"].includes(ART[t._c.code].type));
+  if (S.qSearch) { const q = S.qSearch.toLowerCase(); list = list.filter(t => [t.desc,t.party,t.fop,t._store].join(" ").toLowerCase().includes(q)); }
+  list.sort((a,b) => b.amount - a.amount);
+  const per = 100, pages = Math.max(1, Math.ceil(list.length/per)); if (S.qPage >= pages) S.qPage = 0;
+  const page = list.slice(S.qPage*per, S.qPage*per+per);
+  const f = (v, l) => `<option value="${v}"${S.qFilter===v?" selected":""}>${l}</option>`;
+  let h = `<h2>Розбір платежів</h2><p class="sub">Кожен платіж має отримати статтю й магазин. Застави, оплати оренди, штрафи й банківські комісії CRM розпізнає сама, решту розбирають правила за текстом призначення. Що не впізнано — призначте вручну або створіть правило, щоб наступного місяця воно спрацювало саме. Список відсортовано за сумою: великі платежі впливають на P&amp;L найбільше.</p>`;
+  h += `<div class="toolbar"><label class="ctl" for="qf">Показати <select id="qf">${f("open","Без статті ("+R.open+")")}${f("nostore","Прямі статті без магазину")}${f("auto","Розібрані автоматично")}${f("manual","Розібрані вручну")}${f("all","Усі")}</select></label>
+    <label class="ctl" for="qs">Пошук <input type="text" id="qs" value="${esc(S.qSearch)}" placeholder="контрагент, призначення…"></label>
+    <span class="muted small">${list.length} платежів · ${money(list.reduce((a,t)=>a+t.amount,0))} грн</span></div>`;
+  h += `<div class="frame"><table><thead><tr><th>Дата</th><th>Джерело</th><th>Магазин</th><th>Контрагент / призначення</th><th class="n">Сума</th><th>Стаття</th><th></th></tr></thead><tbody>`;
+  page.forEach(t => {
+    const c = t._c, badge = c.how==="manual" ? `<span class="pill good">вручну</span>` : c.how==="none" ? `<span class="pill warn">не розібрано</span>` : `<span class="pill" title="${esc(c.why)}">${esc(c.why.length>28?c.why.slice(0,26)+"…":c.why)}</span>`;
+    h += `<tr data-id="${esc(t.id)}"><td class="small">${esc(String(t.date||"").slice(0,10))}</td><td class="small">${t.src}${t.fop?`<div class="muted">${esc(t.fop)}</div>`:""}</td>
+      <td><select class="qstore" aria-label="Магазин">${[CENTER].concat(st).map(s=>`<option${s===t._store?" selected":""}>${esc(s)}</option>`).join("")}</select></td>
+      <td><div>${esc(t.party||"—")}</div><div class="desc">${esc(t.desc)}</div></td>
+      <td class="n ${t.dir==="out"?"neg":""}">${t.dir==="out"?"−":"+"}${nf.format(t.amount)}</td>
+      <td><select class="qart" aria-label="Стаття">${articleOptions(c.code)}</select><div>${badge}</div></td>
+      <td><button class="mkrule small" title="Створити правило з цього платежу">+ правило</button></td></tr>`;
+  });
+  if (!page.length) h += `<tr><td colspan="7" class="muted">Тут порожньо. ${S.qFilter==="open"?"Усі платежі періоду мають статтю.":""}</td></tr>`;
+  h += `</tbody></table></div>`;
+  if (pages > 1) h += `<div class="toolbar" style="margin-top:10px"><button id="qprev" ${S.qPage?"":"disabled"}>← Назад</button><span class="small muted">Сторінка ${S.qPage+1} з ${pages}</span><button id="qnext" ${S.qPage<pages-1?"":"disabled"}>Далі →</button></div>`;
+  h += `<div id="ruleForm"></div>`;
+  const v = document.getElementById("v-queue"); v.innerHTML = h;
+  v.querySelector("#qf").onchange = e => { S.qFilter = e.target.value; S.qPage = 0; render(); };
+  v.querySelector("#qs").onchange = e => { S.qSearch = e.target.value.trim(); S.qPage = 0; render(); };
+  if (v.querySelector("#qprev")) { v.querySelector("#qprev").onclick = () => { S.qPage--; render(); }; v.querySelector("#qnext").onclick = () => { S.qPage++; render(); }; }
+  v.querySelectorAll("tr[data-id]").forEach(tr => {
+    const id = tr.dataset.id;
+    tr.querySelector(".qart").onchange = e => { if (e.target.value) S.assign[id] = e.target.value; else delete S.assign[id]; save("assign", S.assign); render(); toast("Статтю збережено"); };
+    tr.querySelector(".qstore").onchange = e => { S.branchSet[id] = e.target.value; save("branchSet", S.branchSet); render(); toast("Магазин збережено"); };
+    tr.querySelector(".mkrule").onclick = () => {
+      const t = S.tx.find(x => x.id === id); const word = (t.party || t.desc || "").split(/[,·;]/)[0].trim().slice(0,40);
+      const box = document.getElementById("ruleForm");
+      box.innerHTML = `<div class="card" style="margin-top:14px"><h3 style="margin-top:0">Нове правило</h3><p class="small muted">Якщо текст призначення або назва контрагента містить фрагмент — призначити статтю. Фрагмент — регулярний вираз без урахування регістру.</p>
+        <div class="row"><label class="ctl" for="nrDir">Напрям <select id="nrDir"><option value="${t.dir}">${t.dir==="in"?"надходження":"витрата"}</option><option value="any">будь-який</option></select></label>
+        <label class="ctl" for="nrRe">Фрагмент <input type="text" id="nrRe" value="${esc(word.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))}" size="30"></label>
+        <label class="ctl" for="nrCode">Стаття <select id="nrCode">${articleOptions(t._c.code)}</select></label>
+        <button class="primary" id="nrSave">Додати правило</button></div></div>`;
+      box.scrollIntoView({behavior:"smooth", block:"nearest"});
+      document.getElementById("nrSave").onclick = () => { const re = document.getElementById("nrRe").value.trim(), code = document.getElementById("nrCode").value;
+        if (!re || !code) { toast("Вкажіть фрагмент і статтю"); return; } if (!rx(re)) { toast("Фрагмент не є коректним виразом"); return; }
+        S.rules.unshift({dir:document.getElementById("nrDir").value, re, code}); save("rules", S.rules); render(); toast("Правило додано й застосовано"); };
+    };
+  });
+}
+
+/* ============================ ДАНІ ПОЗА CRM ============================ */
+const INPUT_FIELDS = [
+ ["amortFleet","Амортизація орендного парку, грн/міс","6.1.01"],["amortCar","Амортизація авто доставки, грн/міс","6.2.01"],["amortOther","Амортизація обладнання / ремонтів, грн/міс","6.3.01"],
+ ["units","Одиниць орендного парку, шт","база Парк_шт"],["fleetValue","Первісна вартість парку, грн","база Парк_варт"],["area","Площа магазину, м²","база Площа"],["contracts","Договорів оренди за місяць","база Договори"],
+ ["daysRented","Днів в оренді (сума по одиницях)","метрика"],["daysAvail","Днів доступності парку","метрика"],["delivContracts","Договорів з доставкою","метрика"],["overdue","Договорів з простроченням","метрика"],["damageRepair","Ремонт після пошкоджень клієнтами, грн","метрика"],
+];
+function renderInputs(){
+  const st = stores(), cols = st.concat([CENTER]);
+  const fops = [...new Set(S.tx.map(t=>t.fop).filter(Boolean))].sort();
+  let h = `<h2>Дані поза CRM</h2><p class="sub">Цих показників немає в розділі платежів, але вони потрібні для амортизації, розподілу загальних витрат і метрик. Заповнюйте раз на місяць. Значення зберігаються в цьому браузері.</p>`;
+  h += `<div class="frame"><table><thead><tr><th>Показник</th><th>Для чого</th>${cols.map(c=>`<th class="n">${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+  INPUT_FIELDS.forEach(([k,l,why]) => { h += `<tr><td>${l}</td><td class="small muted">${why}</td>${cols.map(c => (c===CENTER && k!=="amortOther") ? `<td></td>` : `<td class="n"><input type="number" min="0" step="any" data-s="${esc(c)}" data-k="${k}" value="${S.inputs[c]&&S.inputs[c][k]!=null?S.inputs[c][k]:""}" aria-label="${esc(l)} — ${esc(c)}"></td>`).join("")}</tr>`; });
+  h += `</tbody></table></div>`;
+  h += `<div class="grid2" style="margin-top:16px"><div class="card"><h3 style="margin-top:0">Юрособа → магазин за замовчуванням</h3><p class="small muted">Банківська виписка CRM не містить магазину. Якщо рахунок ФОП обслуговує один магазин, вкажіть його тут — усі платежі з цього рахунку підуть на нього.</p>`;
+  if (!fops.length) h += `<p class="small muted">У даних немає банківських платежів.</p>`;
+  fops.forEach(f => { h += `<div class="row" style="margin-bottom:6px"><span style="min-width:180px">${esc(f)}</span><select data-fop="${esc(f)}" aria-label="Магазин для ${esc(f)}"><option value="">${esc(CENTER)} (розподіл)</option>${st.map(s=>`<option${S.fopBranch[f]===s?" selected":""}>${esc(s)}</option>`).join("")}</select></div>`; });
+  h += `</div><div class="card"><h3 style="margin-top:0">Новий магазин</h3><p class="small muted">Магазини з’являються автоматично з каси CRM. Додайте вручну, якщо його ще немає в даних.</p><div class="row"><input type="text" id="newStore" placeholder="Назва магазину"><button id="addStore">Додати</button></div></div></div>`;
+  const v = document.getElementById("v-inputs"); v.innerHTML = h;
+  v.querySelectorAll("input[data-k]").forEach(i => i.onchange = () => { const s = i.dataset.s; S.inputs[s] = S.inputs[s] || {}; S.inputs[s][i.dataset.k] = i.value === "" ? null : +i.value; save("inputs", S.inputs); render(true); toast("Збережено"); });
+  v.querySelectorAll("select[data-fop]").forEach(sel => sel.onchange = () => { if (sel.value) S.fopBranch[sel.dataset.fop] = sel.value; else delete S.fopBranch[sel.dataset.fop]; save("fopBranch", S.fopBranch); render(true); toast("Збережено"); });
+  v.querySelector("#addStore").onclick = () => { const n = v.querySelector("#newStore").value.trim(); if (!n || n===CENTER) return; S.inputs[n] = S.inputs[n] || {}; save("inputs", S.inputs); render(); toast("Магазин додано"); };
+}
+
+/* ============================ МЕТРИКИ ============================ */
+function renderMetrics(R, L){
+  const st = R.st, get = (c,s) => (R.alloc[c]&&R.alloc[c][s])||0;
+  const div = (a,b) => b ? a/b : null;
+  const repair = s => get("3.3.01",s)+get("3.3.02",s)+get("3.3.03",s);
+  const rentRev = (s,j) => L["rev1.1"].v[j];
+  const M = [
+   ["Фізична завантаженість парку","Днів в оренді / днів доступності. Орієнтир 50–70 %, нижче 30 % — продати або перемістити", (s,j)=>div(inp(s,"daysRented"),inp(s,"daysAvail")), "pct", v=>v==null?null:v>=.5?"good":v>=.3?"warn":"bad"],
+   ["Фінансова завантаженість, разів на рік","Орендна виручка × 12 / первісна вартість парку", (s,j)=>div(rentRev(s,j)*(S.period==="all"?12/Math.max(1,monthsCount()):12),inp(s,"fleetValue")), "x", v=>v==null?null:v>=2?"good":v>=1.2?"warn":"bad"],
+   ["Дохід на одиницю парку на місяць, грн","Орендна виручка / кількість одиниць", (s,j)=>div(rentRev(s,j)/(S.period==="all"?Math.max(1,monthsCount()):1),inp(s,"units")), "money"],
+   ["Термін окупності одиниці, міс.","Середня вартість одиниці / (оренда − ремонт і ТО) на одиницю. Норма 3–8 міс.", (s,j)=>{ const u=inp(s,"units"); const net=(rentRev(s,j)-repair(s))/(S.period==="all"?Math.max(1,monthsCount()):1); return (u&&net>0)?(inp(s,"fleetValue")/u)/(net/u):null; }, "num", v=>v==null?null:v<=8?"good":v<=12?"warn":"bad"],
+   ["Частка ремонту в орендній виручці","(3.3.01 + 3.3.02 + 3.3.03) / виручка оренди. Зростання — парк старіє", (s,j)=>div(repair(s),rentRev(s,j)), "pct", v=>v==null?null:v<=.1?"good":v<=.15?"warn":"bad"],
+   ["Частка доставки у виручці","1.4 / виручка разом", (s,j)=>div(L["rev1.4"].v[j],L.rev.v[j]), "pct"],
+   ["Маржа доставки (до амортизації авто)","(1.4 − 2.4) / 1.4. Від’ємна — переглянути тарифи або зони", (s,j)=>div(L["gp1.4"].v[j],L["rev1.4"].v[j]), "pct", v=>v==null?null:v>=.2?"good":v>=0?"warn":"bad"],
+   ["Частка договорів з доставкою","Договорів з доставкою / усього договорів", (s,j)=>div(inp(s,"delivContracts"),inp(s,"contracts")), "pct"],
+   ["Покриття збитків від пошкоджень","(1.1.05 + 1.1.06) / (3.3.04 + ремонт після пошкоджень). Менше 100 % — застави й акти не працюють", (s,j)=>div(get("1.1.05",s)+get("1.1.06",s), get("3.3.04",s)+inp(s,"damageRepair")), "pct", v=>v==null?null:v>=1?"good":v>=.7?"warn":"bad"],
+   ["Частка договорів з простроченням","Договорів з простроченням / усього договорів", (s,j)=>div(inp(s,"overdue"),inp(s,"contracts")), "pct", v=>v==null?null:v<=.08?"good":v<=.15?"warn":"bad"],
+   ["EBITDA-маржа магазину","З P&L, після розподілу загальних витрат", (s,j)=>div(L.ebitda.v[j],L.rev.v[j]), "pct", v=>v==null?null:v>=.15?"good":v>=0?"warn":"bad"],
+  ];
+  const fmt = (v,t) => v==null ? `<span class="muted">немає даних</span>` : t==="pct" ? pct(v) : t==="x" ? v.toFixed(2).replace(".",",")+"×" : t==="num" ? v.toFixed(1).replace(".",",") : money(v);
+  let h = `<h2>Ключові метрики</h2><p class="sub">Фінансова частина береться з P&amp;L, операційна — з «Дані поза CRM». «Немає даних» означає, що показник для цього магазину не заповнений.</p>`;
+  h += `<div class="frame"><table><thead><tr><th>Метрика</th>${st.map(s=>`<th class="n">${esc(s)}</th>`).join("")}<th>Як рахується</th></tr></thead><tbody>`;
+  M.forEach(([n,how,fn,t,sev]) => { h += `<tr><td><b>${n}</b></td>${st.map((s,j)=>{ const v = fn(s,j); const c = sev ? sev(v) : null; return `<td class="n">${c?`<span class="pill ${c}">${fmt(v,t)}</span>`:fmt(v,t)}</td>`; }).join("")}<td class="small muted" style="min-width:260px">${how}</td></tr>`; });
+  h += `</tbody></table></div>`;
+  document.getElementById("v-metrics").innerHTML = h;
+}
+function monthsCount(){ return new Set(S.tx.map(t=>String(t.date||"").slice(0,7))).size; }
+
+/* ============================ ЗАСТАВИ ============================ */
+function renderDeposits(R){
+  const cols = R.st.concat([CENTER]);
+  let h = `<h2>Контроль застав</h2><p class="sub">Застава — гроші клієнта, а не дохід. У дохід вона потрапляє лише після утримання (CRM: «застава в збиток» або «залік застави»). Сальдо на кінець має збігатися з сумою застав за відкритими договорами в CRM.</p>`;
+  h += `<div class="frame"><table><thead><tr><th>Показник</th>${cols.map(c=>`<th class="n">${esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+  const per = S.period || "all";
+  h += `<tr><td>Сальдо на початок періоду <span class="small muted">(ввести)</span></td>${cols.map(c=>`<td class="n"><input type="number" step="any" data-dep="${esc(c)}" value="${(S.depStart[per]||{})[c]??""}" aria-label="Сальдо застав на початок — ${esc(c)}"></td>`).join("")}</tr>`;
+  const r = (l, f, k) => `<tr class="${k||""}"><td>${l}</td>${cols.map(c=>`<td${cls(f(c))}>${money(f(c))}</td>`).join("")}</tr>`;
+  const start = c => +((S.depStart[per]||{})[c]||0);
+  h += r("+ Отримано застав (8.1.01)", c=>R.dep[c].in);
+  h += r("− Повернуто застав (8.1.02)", c=>R.dep[c].out);
+  h += r("− Утримано й переведено в дохід", c=>R.dep[c].kept);
+  h += r("Сальдо застав на кінець періоду", c=>start(c)+R.dep[c].in-R.dep[c].out-R.dep[c].kept, "key");
+  h += `</tbody></table></div><p class="small muted" style="margin-top:10px">Для звірки потрібна сума застав за відкритими договорами з CRM. У розділі платежів її немає — див. «Чого не вистачає».</p>`;
+  const v = document.getElementById("v-deposits"); v.innerHTML = h;
+  v.querySelectorAll("input[data-dep]").forEach(i => i.onchange = () => { S.depStart[per] = S.depStart[per] || {}; S.depStart[per][i.dataset.dep] = i.value===""?null:+i.value; save("depStart", S.depStart); render(true); });
+}
+
+/* ============================ РУХ ПОЗА P&L ============================ */
+function renderCash(R){
+  const cols = R.st.concat([CENTER]);
+  const np = A.filter(a=>a[2]==="np" && a[0]!=="9.9.99").map(a=>a[0]);
+  let h = `<h2>Рух коштів поза P&amp;L</h2><p class="sub">Застави, інвестиції в парк, кредити, гроші власника й технічні перекази. Вони змінюють залишок грошей, але не прибуток. «+» — надходження, «−» — вибуття.</p>`;
+  h += `<div class="frame"><table><thead><tr><th>Код</th><th>Стаття</th>${cols.map(c=>`<th class="n">${esc(c)}</th>`).join("")}<th class="n">Разом</th></tr></thead><tbody>`;
+  np.forEach(code => { const row = R.raw[code] || {}; const vals = cols.map(c=>row[c]||0); const t = vals.reduce((a,b)=>a+b,0);
+    if (vals.every(v=>!v)) return; h += `<tr><td class="code">${code}</td><td>${esc(ART[code].name)}</td>${vals.map(v=>`<td${cls(v)}>${money(v)}</td>`).join("")}<td${cls(t)}>${money(t)}</td></tr>`; });
+  h += `</tbody></table></div>`;
+  document.getElementById("v-cash").innerHTML = h;
+}
+
+/* ============================ ПРАВИЛА Й ДОВІДНИК ============================ */
+function renderRules(){
+  let h = `<h2>Правила розбору</h2><p class="sub">Правила перевіряються згори вниз після автоматичних правил CRM (застави, оплата оренди, штрафи, комісії банку). Перше правило, що спрацювало, визначає статтю. Ручне призначення завжди має пріоритет.</p>`;
+  h += `<div class="frame"><table><thead><tr><th>Напрям</th><th>Фрагмент у призначенні / контрагенті</th><th>Стаття</th><th></th></tr></thead><tbody>`;
+  S.rules.forEach((r,i) => { h += `<tr><td class="small">${r.dir==="in"?"надходження":r.dir==="out"?"витрата":"будь-який"}</td><td class="mono">${esc(r.re)}</td><td><span class="code mono">${r.code}</span> ${esc(ART[r.code]?ART[r.code].name:"невідома стаття")}</td><td><button class="small" data-del="${i}">Видалити</button></td></tr>`; });
+  h += `</tbody></table></div><div class="row" style="margin-top:10px"><button id="rulesReset">Відновити стандартні правила</button></div>`;
+  h += `<h3>Довідник статей і бази розподілу</h3><div class="frame"><table><thead><tr><th>Код</th><th>Стаття</th><th>Розділ</th><th>Напрямок</th><th>База розподілу «${esc(CENTER)}»</th></tr></thead><tbody>`;
+  A.forEach(a => { const code = a[0], t = ART[code];
+    const canBase = !["np"].includes(t.type);
+    h += `<tr><td class="code">${code}</td><td>${esc(t.name)}</td><td class="small muted">${SECNAMES[code[0]]}</td><td class="small">${esc(t.dir)}</td><td>${canBase?`<select data-base="${code}" aria-label="База для ${code}">${BASES.map(b=>`<option${baseOf(code)===b?" selected":""}>${b}</option>`).join("")}</select>`:`<span class="muted small">не розподіляється</span>`}</td></tr>`; });
+  h += `</tbody></table></div>`;
+  const v = document.getElementById("v-rules"); v.innerHTML = h;
+  v.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { S.rules.splice(+b.dataset.del,1); save("rules", S.rules); render(); toast("Правило видалено"); });
+  v.querySelector("#rulesReset").onclick = () => { S.rules = JSON.parse(JSON.stringify(DEFAULT_RULES)); save("rules", S.rules); render(); toast("Стандартні правила відновлено"); };
+  v.querySelectorAll("[data-base]").forEach(s => s.onchange = () => { S.bases[s.dataset.base] = s.value; save("bases", S.bases); render(true); toast("Базу змінено"); });
+}
+
+/* ============================ ДЖЕРЕЛА ДАНИХ ============================ */
+const SAME_ORIGIN = /budprocat\.com$/i.test(location.hostname);
+async function fetchAll(path, params){
+  const out = []; let cursor = null, guard = 0;
+  do {
+    const q = new URLSearchParams(Object.assign({}, params, cursor ? {cursor} : {}, {limit: 200}));
+    const r = await fetch(path + "?" + q, {credentials:"include"});
+    if (!r.ok) throw new Error(path + ": HTTP " + r.status + (r.status===401?" — увійдіть у CRM у цьому браузері":""));
+    const j = await r.json(); const items = Array.isArray(j) ? j : (j.items || []); out.push(...items);
+    cursor = Array.isArray(j) ? null : j.nextCursor; guard++;
+  } while (cursor && guard < 500);
+  return out;
+}
+async function loadFromCrm(from, to){
+  const st = document.getElementById("crmStatus"); st.textContent = "Завантаження…";
+  try {
+    const [cash, bank, pay] = await Promise.all([
+      fetchAll("/api/v1/cashbox-report/operations", {dateFrom:from, dateTo:to}),
+      fetchAll("/api/v1/banking/transactions", {dateFrom:from, dateTo:to, includeFees:"true"}),
+      fetchAll("/api/v1/payments", {})
+    ]);
+    const payF = pay.filter(p => { const d = String(p.receivedAt).slice(0,10); return d>=from && d<=to; });
+    setData({cash, bank, pay:payF}, "crm"); st.textContent = `Готово: каса ${cash.length}, банк ${bank.length}, платежі ${payF.length}.`;
+  } catch(e){ st.textContent = "Помилка: " + e.message; }
+}
+function setData(groups, source){
+  const m = merge(groups); S.tx = m.tx; S.source = source; S.loadedAt = new Date().toISOString();
+  if (!save("tx", {tx:S.tx, source, loadedAt:S.loadedAt})) toast("Даних забагато для збереження в браузері — після перезавантаження імпортуйте знову");
+  const per = periods(); if (!per.includes(S.period)) S.period = per[per.length-1] || "all";
+  render(); toast(`Завантажено ${S.tx.length} операцій` + (m.dropped?`, ${m.dropped} дублікатів пропущено`:""));
+}
+function parseCsv(text){
+  const sep = (text.split("\n")[0].match(/;/g)||[]).length >= (text.split("\n")[0].match(/,/g)||[]).length ? ";" : ",";
+  const rows = []; let row = [], cur = "", q = false;
+  for (let i=0;i<text.length;i++){ const ch = text[i];
+    if (q) { if (ch==='"' && text[i+1]==='"') { cur+='"'; i++; } else if (ch==='"') q=false; else cur+=ch; }
+    else if (ch==='"') q=true; else if (ch===sep) { row.push(cur); cur=""; } else if (ch==="\n") { row.push(cur); rows.push(row); row=[]; cur=""; } else if (ch!=="\r") cur+=ch; }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const head = rows.shift().map(h=>h.trim().toLowerCase());
+  return rows.filter(r=>r.some(x=>x.trim())).map(r => Object.fromEntries(head.map((h,i)=>[h, (r[i]||"").trim()])));
+}
+function renderData(){
+  const today = new Date(), first = new Date(today.getFullYear(), today.getMonth()-1, 1), last = new Date(today.getFullYear(), today.getMonth(), 0);
+  const iso = d => d.toISOString().slice(0,10);
+  let h = `<h2>Джерела даних</h2><p class="sub">Сторінка читає три розділи CRM: касовий звіт (готівка з магазином і типом операції), банківську виписку (безготівка з юрособою) і платежі (решта). Дублікати між ними відсіюються автоматично.</p><div class="grid2">`;
+  h += `<div class="card"><h3 style="margin-top:0">Пряме підключення до CRM</h3>`;
+  if (SAME_ORIGIN) h += `<p class="small muted">Сторінка відкрита на домені CRM, використовується ваш поточний вхід.</p>`;
+  else h += `<p class="small">Зараз сторінка відкрита <b>не на домені CRM</b>, тому браузер не пустить її до API: CRM вимагає входу й не дозволяє запити з інших сайтів. Щоб кнопка працювала, цей файл має бути розміщений на crm.budprocat.com (див. «Чого не вистачає», п. 1). Поки що — імпорт файлів праворуч.</p>`;
+  h += `<div class="row"><label class="ctl" for="dFrom">З <input type="text" id="dFrom" value="${iso(first)}" size="10"></label><label class="ctl" for="dTo">по <input type="text" id="dTo" value="${iso(last)}" size="10"></label><button class="primary" id="crmLoad" ${SAME_ORIGIN?"":"disabled"}>Завантажити з CRM</button></div><p class="small muted" id="crmStatus"></p></div>`;
+  h += `<div class="card"><h3 style="margin-top:0">Імпорт файлів</h3><p class="small muted">JSON — відповіді API CRM (<span class="mono">/cashbox-report/operations</span>, <span class="mono">/banking/transactions</span>, <span class="mono">/payments</span>), тип розпізнається сам. Можна обрати кілька файлів одразу.<br>CSV — колонки <span class="mono">date; amount; direction; branch; fop; party; description; article</span> (direction: in/out, article — код статті, необов’язково).</p>
+    <input type="file" id="fileIn" accept=".json,.csv,application/json,text/csv" multiple><p class="small muted" id="fileStatus"></p></div>`;
+  h += `<div class="card"><h3 style="margin-top:0">Приклад</h3><p class="small muted">Демонстраційні дані: 3 магазини, 2 місяці. Замінюють поточні дані, правила й ручні призначення не чіпають.</p><button id="demoBtn">Завантажити приклад</button></div>`;
+  h += `<div class="card"><h3 style="margin-top:0">Резервна копія налаштувань</h3><p class="small muted">Правила, ручні призначення, «Дані поза CRM», бази. Скопіюйте текст і збережіть, або вставте збережений і натисніть «Відновити» — так можна перенести налаштування на інший комп’ютер.</p>
+    <textarea id="backup" rows="4" aria-label="Резервна копія"></textarea><div class="row" style="margin-top:6px"><button id="bkCopy">Скопіювати поточні</button><button id="bkRestore">Відновити з тексту</button></div></div>`;
+  h += `</div>`;
+  const v = document.getElementById("v-data"); v.innerHTML = h;
+  if (SAME_ORIGIN) v.querySelector("#crmLoad").onclick = () => loadFromCrm(v.querySelector("#dFrom").value, v.querySelector("#dTo").value);
+  v.querySelector("#demoBtn").onclick = () => { if (!Object.keys(S.inputs).length) { S.inputs = JSON.parse(JSON.stringify(DEMO_INPUTS)); save("inputs", S.inputs); } if (!Object.keys(S.fopBranch).length) { S.fopBranch = Object.assign({}, DEMO_FOPBRANCH); save("fopBranch", S.fopBranch); } setData(demo(), "demo"); };
+  v.querySelector("#fileIn").onchange = async e => {
+    const groups = {cash:[], bank:[], pay:[], csv:[]}; const st = v.querySelector("#fileStatus"); let bad = 0;
+    for (const f of e.target.files) { const text = await f.text();
+      try { if (/\.csv$/i.test(f.name) || !/^\s*[\[{]/.test(text)) { parseCsv(text).forEach((r,i)=>groups.csv.push(normCsvRow(r, f.name+i))); }
+        else { const g = ingest(JSON.parse(text)); groups.cash.push(...g.cash); groups.bank.push(...g.bank); groups.pay.push(...g.pay); if (!g.cash.length && !g.bank.length && !g.pay.length) bad++; } }
+      catch(err){ bad++; } }
+    st.textContent = `Каса ${groups.cash.length}, банк ${groups.bank.length}, платежі ${groups.pay.length}, CSV ${groups.csv.length}` + (bad?` · ${bad} файл(ів) не розпізнано`:"");
+    if (groups.cash.length+groups.bank.length+groups.pay.length+groups.csv.length) { S.inputs = Object.fromEntries(Object.entries(S.inputs).filter(([k])=>!DEMO_INPUTS[k] || S.source!=="demo")); setData(groups, "file"); }
+  };
+  const pack = () => JSON.stringify({rules:S.rules, assign:S.assign, branchSet:S.branchSet, fopBranch:S.fopBranch, inputs:S.inputs, bases:S.bases, depStart:S.depStart});
+  v.querySelector("#bkCopy").onclick = () => { const ta = v.querySelector("#backup"); ta.value = pack(); navigator.clipboard && navigator.clipboard.writeText(ta.value).then(()=>toast("Скопійовано"), ()=>{ ta.select(); toast("Виділено — натисніть Ctrl+C"); }); };
+  v.querySelector("#bkRestore").onclick = () => { try { const o = JSON.parse(v.querySelector("#backup").value); ["rules","assign","branchSet","fopBranch","inputs","bases","depStart"].forEach(k => { if (o[k]) { S[k] = o[k]; save(k, o[k]); } }); render(); toast("Налаштування відновлено"); } catch(e){ toast("Текст не схожий на резервну копію"); } };
+}
+
+/* ============================ ЧОГО НЕ ВИСТАЧАЄ ============================ */
+function renderGaps(R){
+  const sc = R.scope, sum = a => a.reduce((x,t)=>x+t.amount,0);
+  const out = sc.filter(t=>t.dir==="out"), noStore = sc.filter(t=>t._store===CENTER), bankNoStore = sc.filter(t=>t.src==="Банк" && !S.branchSet[t.id] && !(t.fop && S.fopBranch[t.fop]));
+  const outOpen = out.filter(t=>!t._c.code), inOpen = sc.filter(t=>t.dir==="in" && !t._c.code);
+  const rentDaily = sc.filter(t=>t._c.code==="1.1.02" && t._c.how!=="manual");
+  const prod = sc.filter(t=>t.dir==="in" && /продаж|товар|інструмент/i.test(t.desc) && !(t._c.code||"").startsWith("1.1"));
+  const stat = (n, s, of) => `<b>${n}</b> операцій на <b>${money(s)}</b> грн${of?` (${pct(s/(of||1))})`:""}`;
+  const G = [
+   ["bad","1. Сторінка не може сама читати CRM","API CRM (/api/v1/…) працює лише для користувача, що увійшов, і не відповідає на запити з інших сайтів (CORS). Тому ця сторінка, відкрита не з crm.budprocat.com, бачить лише імпортовані файли.","<b>Рішення:</b> розробник CRM кладе цей файл на домен CRM (наприклад <span class='mono'>crm.budprocat.com/reports/pnl</span>) — тоді кнопка «Завантажити з CRM» працює з вашим входом. Альтернатива — сервісний API-ключ (в CRM є розділ «API-ключі») і невеликий сервер-посередник."],
+   ["bad","2. Немає статті витрат у платежах", `Вихідні платежі в CRM мають лише суму, контрагента й текст призначення — поля «стаття» немає. Зараз без статті: ${stat(outOpen.length, sum(outOpen), sum(out))} від усіх витрат періоду.`, "<b>Рішення:</b> додати в CRM довідник статей (коди з цього довідника) і обов’язкове поле «стаття» при проведенні РКО та розборі банківської виписки. До того — правила і ручний розбір на цій сторінці."],
+   ["bad","3. Немає магазину в банківських платежах", `Касові операції прив’язані до відділення, а банківська виписка — лише до ФОП/рахунку. Без магазину: ${stat(bankNoStore.length, sum(bankNoStore))}. Усього без магазину (включно з загальними витратами): ${stat(noStore.length, sum(noStore))}.`, "<b>Рішення:</b> поле «відділення» на банківській транзакції (фільтр branchIds в API вже є — значить, зв’язок через оренду існує, але не віддається в рядку). Тимчасово — «Юрособа → магазин» на вкладці «Дані поза CRM»."],
+   ["warn","4. Немає поділу оренди на погодинну / добову / довгострокову", `Оплата оренди приходить як PAYMENT_IN без типу тарифу, тому вся оренда йде в 1.1.02 «добова»: ${stat(rentDaily.length, sum(rentDaily))}.`, "<b>Рішення:</b> віддавати в платежі тип тарифу/тривалість оренди (з rentItem) або статтю нарахування (accrualSubtype)."],
+   ["warn","5. Продаж і доставка не відрізняються від інших надходжень", `Платіж за реалізацію (/sales) не каже, чи це новий інструмент, б/в з парку чи витратні; доставка — окремий рядок рахунку, але в платежі не видно. Схожих на продаж надходжень без статті «оренда»: ${stat(prod.length, sum(prod))}. Без статті надходжень: ${stat(inOpen.length, sum(inOpen))}.`, "<b>Рішення:</b> у розподілі платежу (allocations) віддавати вид рядка рахунку: оренда / доставка / товар / послуга, а для товару — групу номенклатури (інструмент новий, б/в, витратні)."],
+   ["warn","6. Немає собівартості проданого","CRM знає ціну продажу, але не віддає закупівельну ціну проданих позицій і залишкову вартість б/в. Тому зараз собівартість = оплати постачальникам за місяць (касовий метод), що спотворює маржу продажу.","<b>Рішення:</b> собівартість рядка реалізації (з 1С або закупівельна ціна номенклатури — поле purchasePrice в CRM є)."],
+   ["warn","7. Немає даних про парк","Кількість і вартість одиниць парку, дні в оренді й доступності, амортизація — їх немає в платежах. Без них не рахуються амортизація, бази «Парк_шт/Парк_варт» і половина метрик.", "<b>Рішення:</b> звіт CRM по парку: одиниці з датою й ціною придбання, відділенням приписки, днями в оренді за період. Поки — ручне введення на вкладці «Дані поза CRM»."],
+   ["warn","8. Немає сальдо застав за відкритими договорами","Для звірки застав потрібна сума застав, що зараз на руках, по кожному магазину. Рух застав (DEPOSIT_IN / RETURN / TO_LOSS) у CRM є — це добре.","<b>Рішення:</b> показник «застави на руках на дату» по відділеннях у CRM."],
+   ["warn","9. Зарплата, податки, кредити — одним платежем на компанію","Виплата ЗП і податків зазвичай іде одним платежем з рахунку, без поділу на магазини й офіс.","<b>Рішення:</b> розбивати ЗП за відомістю (відділення працівника є в CRM), або вводити розподіл вручну. Розподіл за базою на цій сторінці — тимчасовий компроміс."],
+   ["good","Що вже є і використовується","Касові операції з відділенням, касою й типом (оплата оренди, застава, повернення застави, штраф, повернення коштів, доплата, утримання застави); банківська виписка з ФОП, контрагентом і банківськими комісіями; зв’язок платежів з орендами й рахунками; дедуплікація каса ↔ платежі ↔ банк.",""]
+  ];
+  let h = `<h2>Чого не вистачає в даних CRM</h2><p class="sub">Аналіз API розділу платежів (/payments), касового звіту й банківської виписки. Цифри нижче рахуються за поточним періодом і поточним набором даних${S.source==="demo"?" (зараз це приклад)":""}.</p><div class="gap-list">`;
+  G.forEach(([s,t,w,f]) => { h += `<div class="gap"><div class="sev ${s}"></div><div class="t">${t}</div><div class="w">${w}</div>${f?`<div class="f">${f}</div>`:""}</div>`; });
+  h += `</div><h3>Поля платежу, які варто додати в CRM (для розробника)</h3><div class="frame"><table><thead><tr><th>Поле</th><th>Де</th><th>Навіщо</th></tr></thead><tbody>
+  <tr><td class="mono">cashflowArticleCode</td><td>Payment, CashOperation, BankTransaction</td><td>Стаття за довідником (1.1.01 … 8.7.01); обов’язкова для вихідних</td></tr>
+  <tr><td class="mono">branchId / branchName</td><td>BankTransaction, Payment</td><td>Магазин для безготівки</td></tr>
+  <tr><td class="mono">allocations[].lineKind</td><td>Payment, BankTransaction</td><td>RENT / DELIVERY / PICKUP / PRODUCT / SERVICE — напрямок доходу</td></tr>
+  <tr><td class="mono">allocations[].tariffKind</td><td>Payment (оренда)</td><td>HOURLY / DAILY / LONG_TERM</td></tr>
+  <tr><td class="mono">allocations[].productGroup, costAmount</td><td>Payment (продаж)</td><td>Новий / б/в з парку / витратні та собівартість рядка</td></tr>
+  <tr><td class="mono">legalEntity (fopId)</td><td>CashOperation</td><td>Юрособа для готівки (зараз є лише в банку)</td></tr>
+  <tr><td class="mono">GET /reports/fleet</td><td>новий звіт</td><td>Одиниці парку: відділення, дата й ціна придбання, дні в оренді за період</td></tr>
+  <tr><td class="mono">GET /reports/deposits-on-hand</td><td>новий звіт</td><td>Застави на руках на дату по відділеннях</td></tr>
+  </tbody></table></div>`;
+  document.getElementById("v-gaps").innerHTML = h;
+}
+
+/* ============================ РЕНДЕР ============================ */
+function periods(){ return [...new Set(S.tx.map(t=>String(t.date||"").slice(0,7)).filter(x=>/^\d{4}-\d{2}$/.test(x)))].sort(); }
+const MONTHS = ["січень","лютий","березень","квітень","травень","червень","липень","серпень","вересень","жовтень","листопад","грудень"];
+function renderHeader(R){
+  const ps = periods();
+  document.getElementById("period").innerHTML = ps.map(p=>`<option value="${p}"${p===S.period?" selected":""}>${MONTHS[+p.slice(5)-1]} ${p.slice(0,4)}</option>`).join("") + `<option value="all"${S.period==="all"?" selected":""}>увесь період</option>`;
+  const fops = [...new Set(S.tx.map(t=>t.fop||"—"))].sort();
+  document.getElementById("fopSel").innerHTML = `<option value="all">усі</option>` + fops.map(f=>`<option${f===S.fop?" selected":""}>${esc(f)}</option>`).join("");
+  const q = document.getElementById("qcnt"); q.hidden = !R.open; q.textContent = R.open;
+  const b = document.getElementById("srcBanner");
+  b.innerHTML = S.source==="demo" ? `<div class="banner demo"><span>ℹ</span><div><b>Зараз показано приклад, а не ваші дані.</b> Щоб побачити свої цифри, імпортуйте вивантаження з CRM на вкладці «Джерела даних». Що потрібно змінити в CRM — на вкладці «Чого не вистачає».</div></div>` : "";
+}
+function render(keepScroll){
+  const ps = periods(); if (!S.period || (S.period!=="all" && !ps.includes(S.period))) S.period = ps[ps.length-1] || "all";
+  const R = compute(); renderHeader(R);
+  const L = renderPnl(R); renderQueue(R); renderInputs(); renderMetrics(R, L); renderDeposits(R); renderCash(R); renderRules(); renderData(); renderGaps(R);
+  showView();
+}
+function showView(){
+  const v = (location.hash||"#pnl").slice(1); const ok = document.getElementById("v-"+v) ? v : "pnl";
+  document.querySelectorAll(".view").forEach(s => s.hidden = s.id !== "v-"+ok);
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.v === ok));
+}
+window.addEventListener("hashchange", showView);
+document.getElementById("period").onchange = e => { S.period = e.target.value; save("period", S.period); render(); };
+document.getElementById("fopSel").onchange = e => { S.fop = e.target.value; render(); };
+
+/* ============================ СТАРТ ============================ */
+(function init(){
+  const saved = load("tx", null);
+  if (saved && saved.tx && saved.tx.length) { S.tx = saved.tx; S.source = saved.source; S.loadedAt = saved.loadedAt; }
+  else {
+    if (!Object.keys(S.inputs).length) S.inputs = JSON.parse(JSON.stringify(DEMO_INPUTS));
+    if (!Object.keys(S.fopBranch).length) S.fopBranch = Object.assign({}, DEMO_FOPBRANCH);
+    const m = merge(demo()); S.tx = m.tx; S.source = "demo";
+  }
+  render();
+})();
+</script>
